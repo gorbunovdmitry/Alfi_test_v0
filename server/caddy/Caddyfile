@@ -1,0 +1,8 @@
+# Terminates HTTPS on :8443 for the Alfi backend.
+# Cert obtained via DNS-01 (DuckDNS) — works even though ports 80/443 are taken.
+{$ALFI_DOMAIN}:8443 {
+	tls {
+		dns duckdns {$DUCKDNS_TOKEN}
+	}
+	reverse_proxy proxy:8090
+}

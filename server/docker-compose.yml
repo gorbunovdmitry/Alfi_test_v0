@@ -1,0 +1,45 @@
+# Fully isolated Alfi backend. Shares NOTHING with naimoteka:
+# own project name (alfi), own network (alfi_internal), own volumes (alfi_caddy_*),
+# only host port 8443 (80/443/5432/8000/8080 untouched).
+# Run with:  docker compose -p alfi up -d --build
+name: alfi
+
+services:
+  proxy:
+    build: ./proxy
+    environment:
+      AITUNNEL_API_KEY: ${AITUNNEL_API_KEY:?set in server/.env}
+      AITUNNEL_MODEL: ${AITUNNEL_MODEL:-gpt-5.4-nano}
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-https://gorbunovdmitry.github.io}
+      PORT: "8090"
+    expose:
+      - "8090"
+    networks:
+      - alfi_internal
+    restart: unless-stopped
+
+  caddy:
+    build: ./caddy
+    depends_on:
+      - proxy
+    environment:
+      ALFI_DOMAIN: ${ALFI_DOMAIN:?e.g. alfi-demo.duckdns.org}
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?DuckDNS token}
+    ports:
+      - "8443:8443"
+    volumes:
+      - alfi_caddy_data:/data
+      - alfi_caddy_config:/config
+    networks:
+      - alfi_internal
+    restart: unless-stopped
+
+networks:
+  alfi_internal:
+    name: alfi_internal
+
+volumes:
+  alfi_caddy_data:
+    name: alfi_caddy_data
+  alfi_caddy_config:
+    name: alfi_caddy_config
