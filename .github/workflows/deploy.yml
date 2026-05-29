@@ -26,9 +26,8 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          # Set repo variable CHAT_API_BASE to the backend URL to enable live GPT chat.
-          # Empty → chat gracefully falls back to scripted answers.
-          VITE_CHAT_API_BASE: ${{ vars.CHAT_API_BASE }}
+          # Live backend (isolated, on the server). Override via repo variable CHAT_API_BASE if it ever changes.
+          VITE_CHAT_API_BASE: ${{ vars.CHAT_API_BASE || 'https://alfitest.duckdns.org:8443' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

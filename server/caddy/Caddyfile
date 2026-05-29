@@ -1,8 +1,14 @@
 # Terminates HTTPS on :8443 for the Alfi backend.
+# Explicit https:// scheme is required on a custom port so Caddy enables TLS.
 # Cert obtained via DNS-01 (DuckDNS) — works even though ports 80/443 are taken.
-{$ALFI_DOMAIN}:8443 {
+# Use public resolvers for the propagation check (server can't reach the
+# authoritative NS directly), and give DuckDNS time to propagate.
+https://{$ALFI_DOMAIN}:8443 {
 	tls {
 		dns duckdns {$DUCKDNS_TOKEN}
+		resolvers 1.1.1.1 8.8.8.8
+		propagation_delay 30s
+		propagation_timeout 5m
 	}
 	reverse_proxy proxy:8090
 }
