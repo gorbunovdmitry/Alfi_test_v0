@@ -76,7 +76,7 @@ function tokenize(text: string): string[][] {
 /** "−1 500,00" / "120 000,00" → number (handles spaces, nbsp, decimal comma). */
 export function parseAmount(raw: string): number {
   const cleaned = raw
-    .replace(/[\s  ]/g, '')
+    .replace(/\s/g, '')
     .replace(',', '.')
     .replace(/[−–—]/g, '-') // normalize unicode minus/dashes
   const n = Number(cleaned)

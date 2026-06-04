@@ -45,6 +45,7 @@ export default defineConfig(({ mode }) => {
                     messages: body.messages ?? [],
                     max_completion_tokens: body.max_completion_tokens ?? 900,
                     ...(body.reasoning_effort ? { reasoning_effort: body.reasoning_effort } : {}),
+                    ...(body.response_format ? { response_format: body.response_format } : {}),
                   }),
                 })
                 const text = await upstream.text()

@@ -128,7 +128,9 @@ export function ChatBottomSheet({
   const endRef = useRef<HTMLDivElement>(null)
   const initRef = useRef(false)
   const messagesRef = useRef(messages)
-  messagesRef.current = messages
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   const send = async (raw: string) => {
     const text = raw.trim()

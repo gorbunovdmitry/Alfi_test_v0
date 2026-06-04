@@ -145,7 +145,7 @@ export function GoalSetupSheet({ open, onClose, ws, onApply }: Props) {
   const goBack = () => setFocus(null)
 
   let title = 'На чём сфокусируемся?'
-  let body: ReactNode = null
+  let body: ReactNode
   let footer: ReactNode = null
 
   if (!focus) {

@@ -1,167 +1,133 @@
 import { useMemo, useState } from 'react'
-import { Settings } from 'lucide-react'
-import type { Goal, RingId, Transaction, WeeklyPlan } from '../types'
 import { accounts, defaultGoal, MOCK_TODAY, transactions, weeklyPlan } from '../data/mockData'
 import { computeWeekState } from '../lib/calculations'
-import { MobileFrame } from '../components/MobileFrame'
-import { ActivityRings } from '../components/ActivityRings'
-import { RingLegend } from '../components/RingLegend'
-import { GoalCard } from '../components/GoalCard'
-import { InsightCard } from '../components/InsightCard'
-import { SafeToSpendCard } from '../components/SafeToSpendCard'
-import { CalculationDetailsCard } from '../components/CalculationDetailsCard'
-import { QuickActions } from '../components/QuickActions'
-import { StickyChatInput } from '../components/StickyChatInput'
-import { RingDetailsSheet } from '../components/sheets/RingDetailsSheet'
-import { GoalSetupSheet } from '../components/sheets/GoalSetupSheet'
+import { DEMO_STATES, DEFAULT_STATE } from '../data/demoStates'
+import type { StateId } from '../data/demoStates'
+import { AlfiAvatar } from '../components/AlfiAvatar'
+import { ToastProvider } from '../components/v2/Toast'
+import { HeroSummary } from '../components/v2/HeroSummary'
+import { RingsDashboard } from '../components/v2/RingsDashboard'
+import { ReservedMoneyCard } from '../components/v2/ReservedMoneyCard'
+import { CalculationExplanation } from '../components/v2/CalculationExplanation'
+import { PurchaseChecker } from '../components/v2/PurchaseChecker'
+import { ActionCards } from '../components/v2/ActionCards'
+import { PassionCard } from '../components/v2/PassionCard'
 import { ChatBottomSheet } from '../components/sheets/ChatBottomSheet'
 
-type Sheet =
-  | null
-  | { kind: 'ring'; ringId: RingId }
-  | { kind: 'goalSetup' }
-  | { kind: 'chat'; prompt?: string }
+const STATE_TABS: { id: StateId; label: string }[] = [
+  { id: 'ok', label: 'Норма' },
+  { id: 'risk', label: 'Риск' },
+  { id: 'bad', label: 'Перерасход' },
+]
 
-let extraSeq = 0
-function makeTransfer(kind: 'goal' | 'savings', amount: number): Transaction {
-  extraSeq += 1
-  const base = {
-    id: `extra_${extraSeq}`,
-    operationDate: MOCK_TODAY,
-    postingDate: MOCK_TODAY,
-    code: 'OP',
-    amount,
-    direction: 'expense' as const,
-    status: 'completed' as const,
-    accountId: 'debit',
-    sourceAccountId: 'debit',
-    isInternalTransfer: false,
-    isObligatory: false,
-    isDebtPayment: false,
-    isRecurring: false,
-    confidence: 1,
-  }
-  if (kind === 'goal') {
-    return {
-      ...base,
-      normalizedCategory: 'goal_contribution',
-      rawCategory: 'goal',
-      description: 'Взнос в цель',
-      destinationAccountId: 'goal_account',
-      isGoalRelated: true,
-      isSavingsRelated: false,
-    }
-  }
-  return {
-    ...base,
-    normalizedCategory: 'savings_transfer',
-    rawCategory: 'savings',
-    description: 'Пополнение накоплений',
-    destinationAccountId: 'savings',
-    isSavingsRelated: true,
-    isGoalRelated: false,
-  }
+function DemoBar({ stateId, onChange }: { stateId: StateId; onChange: (s: StateId) => void }) {
+  return (
+    <div className="sticky top-0 z-30 border-b border-[#ECEDF0] bg-white/85 backdrop-blur">
+      <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <AlfiAvatar size={26} />
+          <span className="truncate text-[14px] font-bold tracking-[-0.01em] text-graphite">
+            Альфи · Финансовая неделя
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden text-[12px] text-gray-mid sm:inline">Демо</span>
+          <div className="flex rounded-full bg-bg-light p-1">
+            {STATE_TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onChange(t.id)}
+                className={`rounded-full px-3 py-1.5 text-[12px] font-semibold transition tap-transparent ${
+                  stateId === t.id ? 'bg-white text-graphite shadow-card-sm' : 'text-gray-mid'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function FinancialWeekScreen() {
-  const [goal, setGoal] = useState<Goal>(defaultGoal)
-  const [plan, setPlan] = useState<WeeklyPlan>(weeklyPlan)
-  const [extraTx, setExtraTx] = useState<Transaction[]>([])
-  const [sheet, setSheet] = useState<Sheet>(null)
+  const [stateId, setStateId] = useState<StateId>(DEFAULT_STATE)
+  const state = DEMO_STATES[stateId]
 
-  const allTx = useMemo(() => [...transactions, ...extraTx], [extraTx])
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatPrompt, setChatPrompt] = useState<string | undefined>(undefined)
+
+  // Chat context is computed from the synthetic statement (independent of the demo states).
   const ws = useMemo(
-    () => computeWeekState(allTx, accounts, goal, plan, MOCK_TODAY),
-    [allTx, goal, plan],
+    () => computeWeekState(transactions, accounts, defaultGoal, weeklyPlan, MOCK_TODAY),
+    [],
   )
 
-  const close = () => setSheet(null)
-  const openRing = (ringId: RingId) => setSheet({ kind: 'ring', ringId })
-  const openGoalSetup = () => setSheet({ kind: 'goalSetup' })
-  const openChat = (prompt?: string) => setSheet({ kind: 'chat', prompt })
-
-  const contributeGoal = (amount: number) => {
-    if (amount <= 0) return
-    setExtraTx((p) => [...p, makeTransfer('goal', amount)])
-    setGoal((g) => ({ ...g, currentAmount: g.currentAmount + amount }))
-  }
-  const addSavings = (amount: number) => {
-    if (amount <= 0) return
-    setExtraTx((p) => [...p, makeTransfer('savings', amount)])
-  }
-  const applyGoal = (newGoal: Goal, weeklyStep: number) => {
-    setGoal(newGoal)
-    setPlan((p) => ({ ...p, goalId: newGoal.id, goalStepTarget: weeklyStep }))
-    close()
+  const openChat = (prompt?: string) => {
+    setChatPrompt(prompt)
+    setChatOpen(true)
   }
 
   return (
-    <MobileFrame>
-      <div className="flex-1 overflow-y-auto bg-bg-light">
-        <div className="space-y-3.5 px-4 pb-8 pt-[max(18px,env(safe-area-inset-top))]">
-          <header className="flex items-center justify-between py-1">
-            <div>
-              <h1 className="text-[24px] font-bold tracking-[-0.02em] text-graphite">
-                Финансовая неделя
-              </h1>
-              <p className="text-[14px] text-gray-mid">26 мая — 1 июня</p>
-            </div>
-            <button
-              aria-label="Настройки"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-dark shadow-card-sm transition active:scale-90 tap-transparent"
-            >
-              <Settings size={20} />
-            </button>
-          </header>
+    <ToastProvider>
+      <div className="min-h-[100dvh] bg-bg-light text-graphite">
+        <DemoBar stateId={stateId} onChange={setStateId} />
 
-          <section className="rounded-[22px] bg-white p-5 shadow-card">
-            <ActivityRings rings={ws.rings} centerPercent={ws.weekControlPercent} onRingClick={openRing} />
-            <div className="mt-3">
-              <RingLegend rings={ws.rings} onRingClick={openRing} />
+        <main className="mx-auto w-full max-w-[1100px] px-4 pb-28 pt-5 sm:px-6">
+          <div className="space-y-4 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
+            {/* LEFT (desktop) / top (mobile): ответ + кольца + CTA */}
+            <div className="space-y-4 lg:col-span-7">
+              <section className="rounded-[22px] bg-white p-5 shadow-card sm:p-7">
+                <HeroSummary state={state} />
+              </section>
+              <section className="rounded-[22px] bg-white p-5 shadow-card sm:p-6">
+                <RingsDashboard rings={state.rings} />
+              </section>
+              {/* CTA «Проверить покупку» — на мобильном идёт третьим блоком */}
+              <div className="lg:hidden">
+                <PurchaseChecker key={state.id} state={state} />
+              </div>
             </div>
-          </section>
 
-          <InsightCard
+            {/* RIGHT (desktop): проверить покупку + уже учтено */}
+            <div className="space-y-4 lg:col-span-5">
+              <div className="hidden lg:block">
+                <PurchaseChecker key={state.id} state={state} />
+              </div>
+              <ReservedMoneyCard state={state} />
+            </div>
+
+            {/* BELOW (full width): что сделать → расшифровка + страсть */}
+            <div className="space-y-4 lg:col-span-12">
+              <ActionCards state={state} />
+              <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-5 lg:space-y-0">
+                <CalculationExplanation state={state} />
+                <PassionCard state={state} />
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* Второстепенный чат Альфи */}
+        <button
+          onClick={() => openChat()}
+          className="fixed bottom-5 right-4 z-40 flex items-center gap-2.5 rounded-full bg-white py-2 pl-2 pr-4 shadow-frame transition active:scale-95 tap-transparent sm:right-6"
+        >
+          <AlfiAvatar size={32} />
+          <span className="text-[14px] font-semibold text-graphite">Спросить Альфи</span>
+        </button>
+
+        {chatOpen && (
+          <ChatBottomSheet
+            open
+            onClose={() => setChatOpen(false)}
             ws={ws}
-            onCloseWeek={() => openChat('Как закрыть неделю?')}
-            onWhy={() => openChat('Почему просело кольцо?')}
+            transactions={transactions}
+            initialPrompt={chatPrompt}
           />
-
-          <GoalCard goal={goal} onEdit={openGoalSetup} />
-
-          <SafeToSpendCard ws={ws} onHow={() => openChat('Сколько можно сегодня потратить?')} />
-          <CalculationDetailsCard ws={ws} />
-          <QuickActions onOpenRing={openRing} onOpenGoalSetup={openGoalSetup} />
-        </div>
+        )}
       </div>
-
-      <StickyChatInput onOpenChat={openChat} />
-
-      {sheet?.kind === 'ring' && (
-        <RingDetailsSheet
-          open
-          ringId={sheet.ringId}
-          ws={ws}
-          onClose={close}
-          onContributeGoal={contributeGoal}
-          onAddSavings={addSavings}
-          onOpenGoalSetup={openGoalSetup}
-          onAsk={openChat}
-        />
-      )}
-      {sheet?.kind === 'goalSetup' && (
-        <GoalSetupSheet open onClose={close} ws={ws} onApply={applyGoal} />
-      )}
-      {sheet?.kind === 'chat' && (
-        <ChatBottomSheet
-          open
-          onClose={close}
-          ws={ws}
-          transactions={allTx}
-          initialPrompt={sheet.prompt}
-          onOpenGoal={() => openRing('goal')}
-        />
-      )}
-    </MobileFrame>
+    </ToastProvider>
   )
 }
